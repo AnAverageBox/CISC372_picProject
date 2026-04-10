@@ -1,3 +1,5 @@
+all: image image_pthread image_omp
+
 image_pthread:image_pthread.c image.h
 	gcc image_pthread.c -o image_pthread -lm -lpthread
 
