@@ -11,6 +11,12 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+int64_t get_time_ms(){ // for timing the execution of the program in milliseconds
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    return (int64_t)ts.tv_sec * 1000 + (ts.tv_nsec / 1000000);
+}   
+
 //An array of kernel matrices to be used for image convolution.  
 //The indexes of these match the enumeration from the header file. ie. algorithms[BLUR] returns the kernel corresponding to a box blur.
 Matrix algorithms[]={
@@ -91,8 +97,9 @@ enum KernelTypes GetKernelType(char* type){
 //main:
 //argv is expected to take 2 arguments.  First is the source file name (can be jpg, png, bmp, tga).  Second is the lower case name of the algorithm.
 int main(int argc,char** argv){
-    long t1,t2;
-    t1=time(NULL);
+    double t1,t2;
+    //t1=time(NULL);
+    t1 = get_time_ms();
 
     stbi_set_flip_vertically_on_load(0); 
     if (argc!=3) return Usage();
@@ -117,7 +124,8 @@ int main(int argc,char** argv){
     stbi_image_free(srcImage.data);
     
     free(destImage.data);
-    t2=time(NULL);
+    //t2=time(NULL);
+    t2 = get_time_ms();
     printf("Took %ld seconds\n",t2-t1);
    return 0;
 }
