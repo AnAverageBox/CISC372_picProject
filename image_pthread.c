@@ -1,10 +1,9 @@
-//HELLO, THIS IS A TEST FOR GIT CHANGES
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
-#include <omp.h> // for OpenMP parallelization
+#include <pthread.h>
 #include "image.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -13,8 +12,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define NUM_THREADS 4
 
-int64_t get_time_ms(){
+int64_t get_time_ms(){ // for timing the execution of the program in milliseconds
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
     return (int64_t)ts.tv_sec * 1000 + (ts.tv_nsec / 1000000);
@@ -30,6 +30,15 @@ Matrix algorithms[]={
     {{-2,-1,0},{-1,1,1},{0,1,2}},
     {{0,0,0},{0,1,0},{0,0,0}}
 };
+
+// Struct to pass arguments to each thread
+typedef struct {
+    Image* srcImage;
+    Image* destImage;
+    Matrix* algorithm;
+    int startRow;
+    int endRow;
+} ThreadArgs;
 
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
 //Paramters: srcImage:  An Image struct populated with the image being convoluted
@@ -60,27 +69,49 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
     return result;
 }
 
-//convolute:  Applies a kernel matrix to an image using OpenMP
+// thread function: each thread processes its given rows of the image
+void* threadConvolute(void* arg) {
+    ThreadArgs* args = (ThreadArgs*)arg;
+    int row, pix, bit;
+    for (row = args->startRow; row < args->endRow; row++) {
+        for (pix = 0; pix < args->srcImage->width; pix++) {
+            for (bit = 0; bit < args->srcImage->bpp; bit++) {
+                args->destImage->data[Index(pix, row, args->srcImage->width, bit, args->srcImage->bpp)] =
+                    getPixelValue(args->srcImage, pix, row, bit, *args->algorithm);
+            }
+        }
+    }
+    return NULL;
+}
+
+//convolute:  Applies a kernel matrix to an image using pthreads
 //Parameters: srcImage: The image being convoluted
 //            destImage: A pointer to a pre-allocated structure to receive the convoluted image.
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
 void convolute(Image* srcImage, Image* destImage, Matrix algorithm) {
-    int row, pix, bit;
-    // parallelize the outer loop across rows, there's no race conditions since
-    // each iteration writes to a unique row in destImage
-    #pragma omp parallel for schedule(dynamic)
-    for (row = 0; row < srcImage->height; row++) {
-        for (pix = 0; pix < srcImage->width; pix++) {
-            for (bit = 0; bit < srcImage->bpp; bit++) {
-                destImage->data[Index(pix, row, srcImage->width, bit, srcImage->bpp)] =
-                    getPixelValue(srcImage, pix, row, bit, algorithm);
-            }
-        }
+    pthread_t threads[NUM_THREADS];
+    ThreadArgs args[NUM_THREADS];
+    int rowsPerThread = srcImage->height / NUM_THREADS;
+    int i;
+
+    for (i = 0; i < NUM_THREADS; i++) {
+        args[i].srcImage = srcImage;
+        args[i].destImage = destImage;
+        args[i].algorithm = &algorithm;
+        args[i].startRow = i * rowsPerThread;
+        // ;ast thread takes any remaining rows
+        args[i].endRow = (i == NUM_THREADS - 1) ? srcImage->height : (i + 1) * rowsPerThread;
+        pthread_create(&threads[i], NULL, threadConvolute, &args[i]);
+    }
+
+    // Wait for all threads to finish
+    for (i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
     }
 }
 
-//Usage: Prints usage information for the program
+//prints usage information for program
 //Returns: -1
 int Usage(){
     printf("Usage: image <filename> <type>\n\twhere type is one of (edge,sharpen,blur,gauss,emboss,identity)\n");
@@ -103,7 +134,6 @@ enum KernelTypes GetKernelType(char* type){
 //argv is expected to take 2 arguments.  First is the source file name (can be jpg, png, bmp, tga).  Second is the lower case name of the algorithm.
 int main(int argc,char** argv){
     int64_t t1,t2;
-    //t1=time(NULL);
     t1 = get_time_ms();
 
     stbi_set_flip_vertically_on_load(0); 
@@ -114,7 +144,7 @@ int main(int argc,char** argv){
     }
     enum KernelTypes type=GetKernelType(argv[2]);
 
-    Image srcImage,destImage;   
+    Image srcImage,destImage,bwImage;   
     srcImage.data=stbi_load(fileName,&srcImage.width,&srcImage.height,&srcImage.bpp,0);
     if (!srcImage.data){
         printf("Error loading file %s.\n",fileName);
@@ -129,7 +159,6 @@ int main(int argc,char** argv){
     stbi_image_free(srcImage.data);
     
     free(destImage.data);
-    //t2=time(NULL);
     t2 = get_time_ms();
     printf("Took %f seconds\n",(t2-t1)/1000.0);
     return 0;
