@@ -126,6 +126,6 @@ int main(int argc,char** argv){
     free(destImage.data);
     //t2=time(NULL);
     t2 = get_time_ms();
-    printf("Took %f seconds\n",(t2-t1)/1000);
+    printf("Took %f seconds\n",(t2-t1)/1000.0);
    return 0;
 }
