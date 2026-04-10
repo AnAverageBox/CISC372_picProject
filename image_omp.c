@@ -98,7 +98,7 @@ enum KernelTypes GetKernelType(char* type){
 //main:
 //argv is expected to take 2 arguments.  First is the source file name (can be jpg, png, bmp, tga).  Second is the lower case name of the algorithm.
 int main(int argc,char** argv){
-    double t1,t2;
+    int64_t t1,t2;
     //t1=time(NULL);
     t1 = get_time_ms();
     stbi_set_flip_vertically_on_load(0); 
