@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
+#include <stdlib.h>
+#include <omp.h> // for OpenMP parallelization
 #include "image.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -21,7 +23,6 @@ Matrix algorithms[]={
     {{-2,-1,0},{-1,1,1},{0,1,2}},
     {{0,0,0},{0,1,0},{0,0,0}}
 };
-
 
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
 //Paramters: srcImage:  An Image struct populated with the image being convoluted
@@ -52,18 +53,21 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
     return result;
 }
 
-//convolute:  Applies a kernel matrix to an image
+//convolute:  Applies a kernel matrix to an image using OpenMP
 //Parameters: srcImage: The image being convoluted
-//            destImage: A pointer to a  pre-allocated (including space for the pixel array) structure to receive the convoluted image.  It should be the same size as srcImage
+//            destImage: A pointer to a pre-allocated structure to receive the convoluted image.
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
-void convolute(Image* srcImage,Image* destImage,Matrix algorithm){
-    int row,pix,bit,span;
-    span=srcImage->bpp*srcImage->bpp;
-    for (row=0;row<srcImage->height;row++){
-        for (pix=0;pix<srcImage->width;pix++){
-            for (bit=0;bit<srcImage->bpp;bit++){
-                destImage->data[Index(pix,row,srcImage->width,bit,srcImage->bpp)]=getPixelValue(srcImage,pix,row,bit,algorithm);
+void convolute(Image* srcImage, Image* destImage, Matrix algorithm) {
+    int row, pix, bit;
+    // parallelize the outer loop across rows, there's no race conditions since
+    // each iteration writes to a unique row in destImage
+    #pragma omp parallel for schedule(dynamic)
+    for (row = 0; row < srcImage->height; row++) {
+        for (pix = 0; pix < srcImage->width; pix++) {
+            for (bit = 0; bit < srcImage->bpp; bit++) {
+                destImage->data[Index(pix, row, srcImage->width, bit, srcImage->bpp)] =
+                    getPixelValue(srcImage, pix, row, bit, algorithm);
             }
         }
     }
@@ -102,7 +106,7 @@ int main(int argc,char** argv){
     }
     enum KernelTypes type=GetKernelType(argv[2]);
 
-    Image srcImage,destImage,bwImage;   
+    Image srcImage,destImage;   
     srcImage.data=stbi_load(fileName,&srcImage.width,&srcImage.height,&srcImage.bpp,0);
     if (!srcImage.data){
         printf("Error loading file %s.\n",fileName);
