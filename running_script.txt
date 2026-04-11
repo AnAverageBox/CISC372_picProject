@@ -1,0 +1,19 @@
+Script started, file is running_script.txt
+[brayanel@r1n01 CISC372_picProject]$ srun ./image_pthread pic1.jpg edge
+Took 7.249000 seconds
+[brayanel@r1n01 CISC372_picProject]$ srun ./image_omp pic1.jpg edge
+Took 6.496000 seconds
+[brayanel@r1n01 CISC372_picProject]$ exit
+exit
+Script done, file is running_script.txt
+[brayanel@r1n01 CISC372_picProject]$ vim image_pthread.c
+[brayanel@r1n01 CISC372_picProject]$ cat running*
+Script started on Fri Apr 10 22:18:33 2026
+[brayanel@r1n01 CISC372_picProject]$ srun ./image_pthread pic1.jpg edge
+Took 7.249000 seconds
+[brayanel@r1n01 CISC372_picProject]$ srun ./image_omp pic1.jpg edge
+Took 6.496000 seconds
+[brayanel@r1n01 CISC372_picProject]$ exit
+exit
+
+Script done on Fri Apr 10 22:19:47 2026
